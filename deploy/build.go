@@ -1,21 +1,62 @@
 package deploy
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"log"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
 )
 
 type Project struct {
-	Owner  string
-	Name   string
-	Assets []string
+	Owner  string   `json:"owner"`
+	Name   string   `json:"name"`
+	Assets []string `json:"assets"`
 }
 
 func init() {
 	exec.Command("go", "get", "-u", "github.com/dags-/bundler")
 	exec.Command("go", "install", "github.com/dags-/bundler")
+}
+
+func LoadProjects() map[string]*Project {
+	u, e := user.Current()
+	if e != nil {
+		panic(e)
+	}
+
+	dir := filepath.Join(u.HomeDir, "deployer")
+	if _, e := os.Stat(dir); e != nil {
+		os.Mkdir(dir, os.ModePerm)
+		return map[string]*Project{}
+	}
+
+	fs, e := ioutil.ReadDir(dir)
+	if e != nil {
+		panic(e)
+	}
+
+	projects := make(map[string]*Project)
+	for _, f := range fs {
+		o, e := os.Open(f.Name())
+		if e != nil {
+			log.Println("open file error:", e)
+			continue
+		}
+
+		var project Project
+		e = json.NewDecoder(o).Decode(&project)
+		if e != nil {
+			log.Println("decode err:", e)
+			continue
+		}
+
+		projects[project.Owner+"/"+project.Name] = &project
+	}
+	return projects
 }
 
 func Build(project *Project) (artifacts []string, e error) {

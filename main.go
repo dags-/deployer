@@ -17,11 +17,11 @@ import (
 )
 
 var (
-	token  string
-	secret string
-	port   string
-	queue  chan *build
-	config *deploy.Project
+	token    string
+	secret   string
+	port     string
+	queue    chan *build
+	projects map[string]*deploy.Project
 )
 
 type build struct {
@@ -33,23 +33,14 @@ type build struct {
 func init() {
 	t := flag.String("token", "", "github token")
 	s := flag.String("secret", "", "webhook secret")
-	p := flag.String("port", "8088", "server port")
+	p := flag.String("port", "8095", "server port")
 	flag.Parse()
 
 	secret = mustFlag("secret", s)
 	token = mustFlag("token", t)
 	port = mustFlag("port", p)
 	queue = make(chan *build)
-
-	config = &deploy.Project{
-		Owner: "dags-",
-		Name:  "launch",
-		Assets: []string{
-			"builds/darwin/*.zip",
-			"builds/windows/*.zip",
-			"builds/linux/*.AppImage",
-		},
-	}
+	projects = deploy.LoadProjects()
 }
 
 func main() {
@@ -70,9 +61,23 @@ func handleCommands() {
 		if line == "stop" {
 			log.Println("stop invoked")
 			os.Exit(0)
+			continue
 		}
-		if line == "build" {
-			b, e := latestRelease("dags-", "launch")
+
+		if strings.HasPrefix(line, "build") {
+			split := strings.Split(line, " ")
+			if len(split) != 2 {
+				log.Println("owner/repo required")
+				continue
+			}
+
+			project, exists := projects[split[1]]
+			if !exists {
+				log.Println("invalid project", split[1])
+				continue
+			}
+
+			b, e := latestRelease(project.Owner, project.Name)
 			if e != nil {
 				log.Println("get release error:", e)
 			} else {
@@ -89,7 +94,7 @@ func handleRelease(payload interface{}, header webhooks.Header) {
 		return
 	}
 
-	log.Println("release received:", r.Repository.Name)
+	log.Println("release received:", r.Repository.FullName)
 	queue <- &build{
 		owner: r.Repository.Owner.Login,
 		repo:  r.Repository.Name,
@@ -99,8 +104,13 @@ func handleRelease(payload interface{}, header webhooks.Header) {
 
 func handleBuilds() {
 	for b := range queue {
+		project, exists := projects[b.owner+"/"+b.repo]
+		if !exists {
+			continue
+		}
+
 		log.Println("build received")
-		artifacts, e := deploy.Build(config)
+		artifacts, e := deploy.Build(project)
 		if e != nil {
 			log.Println("deploy error:", e)
 			return
