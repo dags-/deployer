@@ -54,7 +54,9 @@ func LoadProjects() map[string]*Project {
 			continue
 		}
 
-		projects[project.Owner+"/"+project.Name] = &project
+		repo := project.Owner + "/" + project.Name
+		projects[repo] = &project
+		log.Println("loaded project:", repo)
 	}
 	return projects
 }

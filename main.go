@@ -94,7 +94,8 @@ func handleRelease(payload interface{}, header webhooks.Header) {
 		return
 	}
 
-	log.Println("release received:", r.Repository.FullName)
+	repo := r.Repository.Owner.Login + "/" + r.Repository.Name
+	log.Println("release received:", repo)
 	queue <- &build{
 		owner: r.Repository.Owner.Login,
 		repo:  r.Repository.Name,
