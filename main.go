@@ -111,9 +111,12 @@ func handleBuilds() {
 			e := deploy.UploadAsset(b.owner, b.repo, b.id, artifact, token)
 			if e != nil {
 				log.Println("upload error:", e)
+			} else {
+				log.Println("upload complete:", artifact)
 			}
 			time.Sleep(time.Second)
 		}
+		log.Println("deploy complete!")
 	}
 }
 
