@@ -41,7 +41,7 @@ func LoadProjects() map[string]*Project {
 
 	projects := make(map[string]*Project)
 	for _, f := range fs {
-		o, e := os.Open(f.Name())
+		o, e := os.Open(filepath.Join(dir, f.Name()))
 		if e != nil {
 			log.Println("open file error:", e)
 			continue
