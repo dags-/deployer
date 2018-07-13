@@ -19,9 +19,9 @@ func init() {
 }
 
 func Build(project *Project) (artifacts []string, e error) {
-	path := fmt.Sprintf("github.com/%s/%s", project.Owner, project.Name)
+	p := fmt.Sprintf("github.com/%s/%s", project.Owner, project.Name)
 
-	c := exec.Command("bundler", path)
+	c := exec.Command("bundler", p)
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 	e = c.Run()
@@ -29,9 +29,15 @@ func Build(project *Project) (artifacts []string, e error) {
 		return artifacts, e
 	}
 
-	filepath.Walk(workDir(path), func(path string, info os.FileInfo, err error) error {
+	for i, r := range project.Assets {
+		project.Assets[i] = filepath.FromSlash(r)
+	}
+
+	dir := workDir(p)
+	filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		rel, _ := filepath.Rel(dir, path)
 		for _, rule := range project.Assets {
-			if match, e := filepath.Match(rule, path); e == nil && match {
+			if match, e := filepath.Match(rule, rel); e == nil && match {
 				artifacts = append(artifacts, path)
 			}
 		}

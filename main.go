@@ -39,14 +39,15 @@ func init() {
 	secret = mustFlag("secret", s)
 	token = mustFlag("token", t)
 	port = mustFlag("port", p)
+	queue = make(chan *build)
 
 	config = &deploy.Project{
 		Owner: "dags-",
 		Name:  "launch",
 		Assets: []string{
-			"builds\\darwin\\*.zip",
-			"builds\\windows\\*.zip",
-			"builds\\linux\\*.AppImage",
+			"builds/darwin/*.zip",
+			"builds/windows/*.zip",
+			"builds/linux/*.AppImage",
 		},
 	}
 }
@@ -65,15 +66,17 @@ func main() {
 func handleCommands() {
 	s := bufio.NewScanner(os.Stdin)
 	for s.Scan() {
-		line := strings.ToLower(s.Text())
-		if strings.HasPrefix(line, "stop") {
+		line := strings.ToLower(strings.TrimSpace(s.Text()))
+		if line == "stop" {
+			log.Println("stop invoked")
 			os.Exit(0)
 		}
-		if strings.HasPrefix(line, "build") {
+		if line == "build" {
 			b, e := latestRelease("dags-", "launch")
 			if e != nil {
 				log.Println("get release error:", e)
 			} else {
+				log.Println("build invoked")
 				queue <- b
 			}
 		}
@@ -95,8 +98,8 @@ func handleRelease(payload interface{}, header webhooks.Header) {
 }
 
 func handleBuilds() {
-	for {
-		b := <-queue
+	for b := range queue {
+		log.Println("build received")
 		artifacts, e := deploy.Build(config)
 		if e != nil {
 			log.Println("deploy error:", e)
